@@ -1,0 +1,62 @@
+{
+    "name": "swellsystems/conversa",
+    "description": "A modern, Slack-like communication package for Laravel multi-tenant applications with enterprise-grade security and real-time features",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "SwellSystems",
+            "email": "dev@swellsystems.com"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "^10.0",
+        "illuminate/database": "^10.0",
+        "illuminate/broadcasting": "^10.0",
+        "illuminate/events": "^10.0",
+        "illuminate/http": "^10.0",
+        "illuminate/view": "^10.0",
+        "pusher/pusher-php-server": "^7.0",
+        "cboden/ratchet": "^0.4.4",
+        "react/socket": "^1.12",
+        "meilisearch/meilisearch-php": "^1.0",
+        "laravel/scout": "^10.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0",
+        "phpunit/phpunit": "^10.0",
+        "laravel/pint": "^1.0",
+        "mockery/mockery": "^1.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "SwellSystems\\Conversa\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "VendorName\\Conversa\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "VendorName\\Conversa\\ConversaServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage",
+        "format": "vendor/bin/pint"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "suggest": {
+        "pusher/pusher-php-server": "Required for real-time messaging functionality"
+    }
+}
