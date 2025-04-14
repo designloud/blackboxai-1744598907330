@@ -15,6 +15,14 @@ A modern, Slack-like communication package for Laravel multi-tenant applications
 - 🏷️ User and channel mentions with notifications
 - 🔗 Smart URL previews
 - ✨ Rich text formatting with Markdown
+- ⏰ Message reminders and scheduling
+- 📥 Mark messages as unread
+
+### Message Management
+- **Reminders**: Set reminders to revisit messages later
+- **Scheduled Messages**: Schedule messages to be sent at specific times
+- **Read Status**: Mark messages as read/unread
+- **Natural Language Time**: Parse human-friendly time expressions
 
 ### Message Formatting
 - **Markdown Support**: Full Markdown syntax for rich text formatting
@@ -88,33 +96,6 @@ MEILISEARCH_KEY=your-meilisearch-key
 CONVERSA_ENCRYPTION_KEY=your-encryption-key
 ```
 
-### Message Formatting Configuration
-
-Configure formatting options in `config/conversa.php`:
-
-```php
-'formatting' => [
-    'max_message_length' => 10000,
-    'markdown' => [
-        'enabled' => true,
-        'safe_mode' => true,
-    ],
-    'mentions' => [
-        'user_pattern' => '@[a-zA-Z0-9_]{3,}',
-        'channel_pattern' => '#[a-zA-Z0-9_-]{2,}',
-    ],
-    'emoji' => [
-        'enabled' => true,
-    ],
-],
-
-'url_preview' => [
-    'enabled' => true,
-    'max_previews_per_message' => 3,
-    'cache_duration' => 86400, // 24 hours
-],
-```
-
 ## Usage
 
 ### Initialize the JavaScript Client
@@ -143,37 +124,71 @@ const conversa = new Conversa({
 });
 ```
 
-### Send a Formatted Message
+### Message Management
 
 ```php
 use SwellSystems\Conversa\Models\ConversaMessage;
 
-$message = ConversaMessage::create([
-    'workspace_id' => 1,
-    'space_id' => $space->id,
-    'user_id' => auth()->id(),
-    'content' => "# Meeting Notes\n\n- @sarah please review the docs\n- Check out #general for updates\n- Great work team! :rocket:",
-    'type' => 'text',
-]);
+// Set a reminder for a message
+$message->setReminder(auth()->id(), 'Remind me tomorrow at 9am');
 
-// Message will be automatically formatted with:
-// - Markdown rendering
-// - User/channel mention parsing
-// - Emoji conversion
-// - URL preview generation
+// Schedule a message to be sent later
+$message->scheduleFor('tomorrow at 9am');
+
+// Mark a message as unread
+$message->markAsUnread(auth()->id());
+
+// Mark a message as read
+$message->markAsRead(auth()->id());
+
+// Check read status
+$isRead = $message->hasBeenReadBy(auth()->id());
 ```
 
-### Handle Mentions
+### Working with Reminders
 
 ```php
-// Get all mentions in a message
-$mentions = $message->mentions;
+use SwellSystems\Conversa\Models\ConversaReminder;
 
-// Get unread mentions for a user
-$unreadCount = ConversaMention::getUnreadCountForUser(auth()->id());
+// Create a reminder with natural language
+$reminder = ConversaReminder::createFromText(
+    'Check this in 3 hours',
+    $messageId,
+    auth()->id(),
+    $workspaceId
+);
 
-// Mark mentions as read
-ConversaMention::markAllAsRead(auth()->id());
+// Snooze a reminder
+$reminder->snooze('tomorrow');
+
+// Cancel a reminder
+$reminder->cancel();
+
+// Get upcoming reminders
+$reminders = ConversaReminder::getUpcomingForUser(auth()->id());
+```
+
+### Scheduled Messages
+
+```php
+use SwellSystems\Conversa\Models\ConversaScheduledMessage;
+
+// Schedule a new message
+$scheduled = ConversaScheduledMessage::scheduleFromText([
+    'workspace_id' => 1,
+    'space_id' => $spaceId,
+    'content' => 'Good morning team!',
+    'user_id' => auth()->id(),
+], 'tomorrow at 9am');
+
+// Reschedule a message
+$scheduled->reschedule('next monday at 10am');
+
+// Cancel a scheduled message
+$scheduled->cancel();
+
+// Get upcoming scheduled messages
+$messages = ConversaScheduledMessage::getUpcomingForUser(auth()->id());
 ```
 
 ### Real-time Events
@@ -182,48 +197,24 @@ ConversaMention::markAllAsRead(auth()->id());
 // Subscribe to a space
 const channel = conversa.subscribeToSpace(spaceId);
 
-// Listen for new messages
-channel.listen('message.sent', (e) => {
-    console.log('New message:', e.message);
+// Listen for reminders
+channel.listen('reminder.due', (e) => {
+    console.log('Reminder:', e.reminder);
 });
 
-// Listen for mentions
-channel.listen('user.mentioned', (e) => {
-    console.log('You were mentioned in:', e.message);
-});
-
-// Track presence
-channel.here((users) => {
-    console.log('Online users:', users);
+// Listen for read status changes
+channel.listen('message.read', (e) => {
+    console.log('Message read by:', e.user_id);
 });
 ```
 
-## Security
+## Console Commands
 
-### Message Encryption
+Process scheduled messages and reminders:
 
-Messages are automatically encrypted using AES-256-GCM when encryption is enabled:
-
-```php
-// config/conversa.php
-return [
-    'encryption' => [
-        'enabled' => true,
-        'key' => env('CONVERSA_ENCRYPTION_KEY'),
-    ],
-];
-```
-
-### Rate Limiting
-
-Configure rate limits in `config/conversa.php`:
-
-```php
-'rate_limits' => [
-    'messages_per_minute' => 30,
-    'reactions_per_minute' => 60,
-    'mentions_per_message' => 50,
-],
+```bash
+# Add to your scheduler
+php artisan conversa:process-scheduled
 ```
 
 ## Testing
