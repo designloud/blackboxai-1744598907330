@@ -27,6 +27,7 @@ class ConversaMessage extends Model
         'thread_id',
         'user_id',
         'parent_id',
+        'scheduled_message_id',
         'content',
         'type',
         'metadata',
@@ -137,6 +138,14 @@ class ConversaMessage extends Model
     }
 
     /**
+     * Get the scheduled message that created this message.
+     */
+    public function scheduledMessage(): BelongsTo
+    {
+        return $this->belongsTo(ConversaScheduledMessage::class, 'scheduled_message_id');
+    }
+
+    /**
      * Get the replies to this message.
      */
     public function replies(): HasMany
@@ -166,6 +175,14 @@ class ConversaMessage extends Model
     public function readReceipts(): HasMany
     {
         return $this->hasMany(ConversaReadReceipt::class, 'message_id');
+    }
+
+    /**
+     * Get the reminders for the message.
+     */
+    public function reminders(): HasMany
+    {
+        return $this->hasMany(ConversaReminder::class, 'message_id');
     }
 
     /**
@@ -291,10 +308,38 @@ class ConversaMessage extends Model
      */
     public function markAsRead(int $userId): void
     {
-        $this->readReceipts()->updateOrCreate(
+        $receipt = $this->readReceipts()->updateOrCreate(
             ['user_id' => $userId],
-            ['read_at' => now()]
+            ['read_at' => now(), 'is_unread' => false]
         );
+
+        // Update read/unread counts
+        $this->updateReadCounts();
+    }
+
+    /**
+     * Mark the message as unread by a user.
+     */
+    public function markAsUnread(int $userId): void
+    {
+        $receipt = $this->readReceipts()->updateOrCreate(
+            ['user_id' => $userId],
+            ['is_unread' => true]
+        );
+
+        // Update read/unread counts
+        $this->updateReadCounts();
+    }
+
+    /**
+     * Update read and unread counts.
+     */
+    protected function updateReadCounts(): void
+    {
+        $this->update([
+            'read_count' => $this->readReceipts()->whereNotNull('read_at')->where('is_unread', false)->count(),
+            'unread_count' => $this->readReceipts()->where('is_unread', true)->count(),
+        ]);
     }
 
     /**
@@ -305,6 +350,7 @@ class ConversaMessage extends Model
         return $this->readReceipts()
             ->where('user_id', $userId)
             ->whereNotNull('read_at')
+            ->where('is_unread', false)
             ->exists();
     }
 
@@ -317,7 +363,39 @@ class ConversaMessage extends Model
             ->where('user_id', $userId)
             ->first();
 
-        return $receipt ? $receipt->read_at->toISOString() : null;
+        if (!$receipt || $receipt->is_unread) {
+            return null;
+        }
+
+        return $receipt->read_at?->toISOString();
+    }
+
+    /**
+     * Set a reminder for this message.
+     */
+    public function setReminder(int $userId, string $reminderText): ConversaReminder
+    {
+        return ConversaReminder::createFromText(
+            $reminderText,
+            $this->id,
+            $userId,
+            $this->workspace_id
+        );
+    }
+
+    /**
+     * Schedule this message to be sent later.
+     */
+    public function scheduleFor(string $scheduleTime): ConversaScheduledMessage
+    {
+        return ConversaScheduledMessage::scheduleFromText([
+            'workspace_id' => $this->workspace_id,
+            'space_id' => $this->space_id,
+            'thread_id' => $this->thread_id,
+            'user_id' => $this->user_id,
+            'content' => $this->content,
+            'metadata' => $this->metadata,
+        ], $scheduleTime);
     }
 
     /**
